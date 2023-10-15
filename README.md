@@ -1,16 +1,16 @@
 
-# PayPal Payment Checkout Package
+# Flutter PayPal Payment Package
 
-The PayPal Payment checkout Package is a convenient solution that enables seamless integration of PayPal payments into your mobile application. This README provides an overview of the package and guides you on how to use it effectively.
+The Flutter PayPal Payment Package is a convenient solution that enables seamless integration of PayPal payments into your mobile application. This README provides an overview of the package and guides you on how to use it effectively.
 
 ## Installation
 
-To install the PayPal In-App Payment Package, follow these steps
+To install the Flutter PayPal Payment Package, follow these steps
 
 1. Add the package to your project's dependencies in the `pubspec.yaml` file:
    ```yaml
    dependencies:
-     paypal_in_app_payment: ^1.0.0
+     flutter_paypal_payment: ^1.0.0
     ``` 
 2. Run the following command to fetch the package:
 
@@ -22,7 +22,7 @@ To install the PayPal In-App Payment Package, follow these steps
 1. Import the package into your Dart file:
 
     ``` 
-    import 'package:paypal_in_app_payment/paypal_in_app_payment.dart';
+    import 'package:flutter_paypal_payment/flutter_paypal_payment.dart';
     ```
 2. Navigate to the PayPal checkout view with the desired configuration:
     ```dart
