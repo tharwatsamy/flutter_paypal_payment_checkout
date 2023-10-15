@@ -87,6 +87,12 @@ class PaypalServices {
         return {"executeUrl": executeUrl, "approvalUrl": approvalUrl};
       }
       return {};
+    } on DioException catch (e) {
+      return {
+        'error': true,
+        'message': "Payment Failed.",
+        'data': e.response?.data,
+      };
     } catch (e) {
       rethrow;
     }
