@@ -35,7 +35,7 @@ To install the Flutter PayPal Payment Package, follow these steps
     ],
     onSuccess: (Map params) async {
         // Handle successful payment
-    },
+ },
     onError: (error) {
         // Handle payment error
     },
