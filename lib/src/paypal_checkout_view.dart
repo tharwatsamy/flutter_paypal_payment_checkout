@@ -5,7 +5,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_paypal_payment/src/paypal_service.dart';
 
 class PaypalCheckoutView extends StatefulWidget {
-  final Function? onSuccess, onCancel, onError;
+  final Function onSuccess, onCancel, onError;
   final String? note, clientId, secretKey;
 
   final Widget? loadingIndicator;
@@ -13,9 +13,9 @@ class PaypalCheckoutView extends StatefulWidget {
   final bool? sandboxMode;
   const PaypalCheckoutView({
     Key? key,
-    this.onSuccess,
-    this.onError,
-    this.onCancel,
+    required this.onSuccess,
+    required this.onError,
+    required this.onCancel,
     required this.transactions,
     required this.clientId,
     required this.secretKey,
@@ -82,13 +82,13 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
               executeUrl = res["executeUrl"];
             });
           } else {
-            widget.onError!(res);
+            widget.onError(res);
           }
         } else {
-          widget.onError!("${getToken['message']}");
+          widget.onError("${getToken['message']}");
         }
       } catch (e) {
-        widget.onError!(e);
+        widget.onError(e);
       }
     });
   }
@@ -131,7 +131,7 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
                 webView = controller;
               },
               onCloseWindow: (InAppWebViewController controller) {
-                widget.onCancel!();
+                widget.onCancel();
               },
               onProgressChanged:
                   (InAppWebViewController controller, int progress) {
@@ -173,11 +173,15 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
     if (payerID != null) {
       services.executePayment(executeUrl, payerID, accessToken).then(
         (id) {
-          widget.onSuccess!(id);
+          if (id['error'] == false) {
+            widget.onSuccess(id);
+          } else {
+            widget.onError(id);
+          }
         },
       );
     } else {
-      Navigator.of(context).pop();
+      widget.onError('Something went wront PayerID == null');
     }
   }
 }
