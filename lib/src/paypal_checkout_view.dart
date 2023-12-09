@@ -11,7 +11,7 @@ class PaypalCheckoutView extends StatefulWidget {
 
   final Widget? loadingIndicator;
   final List? transactions;
-  final bool? sandboxMode;
+  final bool sandboxMode, defaultAppBar;
   const PaypalCheckoutView({
     Key? key,
     required this.onSuccess,
@@ -23,6 +23,7 @@ class PaypalCheckoutView extends StatefulWidget {
     required this.returnURL,
     required this.cancelURL,
     this.sandboxMode = false,
+    this.defaultAppBar = true,
     this.note = '',
     this.loadingIndicator,
   }) : super(key: key);
@@ -61,7 +62,7 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
   @override
   void initState() {
     services = PaypalServices(
-      sandboxMode: widget.sandboxMode!,
+      sandboxMode: widget.sandboxMode,
       clientId: widget.clientId!,
       secretKey: widget.secretKey!,
     );
@@ -97,14 +98,14 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
   Widget build(BuildContext context) {
     if (checkoutUrl != null) {
       return Scaffold(
-        appBar: AppBar(
+        appBar: (widget.defaultAppBar) ? AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
           centerTitle: true,
           title: const Text(
             "Paypal Payment",
           ),
-        ),
+        ) : null,
         body: Stack(
           children: <Widget>[
             InAppWebView(
@@ -153,14 +154,14 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
       );
     } else {
       return Scaffold(
-        appBar: AppBar(
+        appBar: (widget.defaultAppBar) ? AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
           centerTitle: true,
           title: const Text(
             "Paypal Payment",
           ),
-        ),
+        ) : null,
         body: Center(
             child:
                 widget.loadingIndicator ?? const CircularProgressIndicator()),
