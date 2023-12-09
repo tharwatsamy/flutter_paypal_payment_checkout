@@ -30,6 +30,8 @@ To install the Flutter PayPal Payment Package, follow these steps
     sandboxMode: true,
     clientId: "YOUR_CLIENT_ID",
     secretKey: "YOUR_SECRET_KEY",
+    returnURL: "YOUR_RETURN_URL",
+    cancelURL: "YOUR_CANCEL_URL",
     transactions: const [
         // Define your transaction details here
     ],
