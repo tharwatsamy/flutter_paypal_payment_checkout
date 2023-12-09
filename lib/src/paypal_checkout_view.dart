@@ -7,6 +7,7 @@ import 'package:flutter_paypal_payment/src/paypal_service.dart';
 class PaypalCheckoutView extends StatefulWidget {
   final Function onSuccess, onCancel, onError;
   final String? note, clientId, secretKey;
+  final String returnURL, cancelURL;
 
   final Widget? loadingIndicator;
   final List? transactions;
@@ -19,6 +20,8 @@ class PaypalCheckoutView extends StatefulWidget {
     required this.transactions,
     required this.clientId,
     required this.secretKey,
+    required this.returnURL,
+    required this.cancelURL,
     this.sandboxMode = false,
     this.note = '',
     this.loadingIndicator,
@@ -41,9 +44,6 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
   late PaypalServices services;
   int pressed = 0;
   double progress = 0;
-  final String returnURL =
-      'https://www.youtube.com/channel/UC9a1yj1xV2zeyiFPZ1gGYGw';
-  final String cancelURL = 'https://www.facebook.com/tharwat.samy.9';
 
   late InAppWebViewController webView;
 
@@ -53,7 +53,7 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
       "payer": {"payment_method": "paypal"},
       "transactions": widget.transactions,
       "note_to_payer": widget.note,
-      "redirect_urls": {"return_url": returnURL, "cancel_url": cancelURL}
+      "redirect_urls": {"return_url": widget.returnURL, "cancel_url": widget.cancelURL}
     };
     return temp;
   }
@@ -111,11 +111,11 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
               shouldOverrideUrlLoading: (controller, navigationAction) async {
                 final url = navigationAction.request.url;
 
-                if (url.toString().contains(returnURL)) {
-                  exceutePayment(url, context);
+                if (url.toString().contains(widget.returnURL)) {
+                  executePayment(url, context);
                   return NavigationActionPolicy.CANCEL;
                 }
-                if (url.toString().contains(cancelURL)) {
+                if (url.toString().contains(widget.cancelURL)) {
                   return NavigationActionPolicy.CANCEL;
                 } else {
                   return NavigationActionPolicy.ALLOW;
@@ -168,7 +168,7 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
     }
   }
 
-  void exceutePayment(Uri? url, BuildContext context) {
+  void executePayment(Uri? url, BuildContext context) {
     final payerID = url!.queryParameters['PayerID'];
     if (payerID != null) {
       services.executePayment(executeUrl, payerID, accessToken).then(
@@ -181,7 +181,7 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
         },
       );
     } else {
-      widget.onError('Something went wront PayerID == null');
+      widget.onError('Something went wrong PayerID == null');
     }
   }
 }

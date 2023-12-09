@@ -24,6 +24,8 @@ class PaypalPaymentDemo extends StatelessWidget {
                   sandboxMode: true,
                   clientId: "YOUR CLIENT ID",
                   secretKey: "YOUR SECRET KEY",
+                    returnURL: "YOUR_RETURN_URL",
+                    cancelURL: "YOUR_CANCEL_URL",
                   transactions: const [
                     {
                       "amount": {
