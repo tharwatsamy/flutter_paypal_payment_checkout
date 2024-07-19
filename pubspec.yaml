@@ -11,7 +11,7 @@ dependencies:
   dio: ^5.3.3
   flutter:
     sdk: flutter
-  flutter_inappwebview: ^5.8.0
+  flutter_inappwebview: ^6.0.0
 
 
 
