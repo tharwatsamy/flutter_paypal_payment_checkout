@@ -11,6 +11,7 @@ class PaypalCheckoutView extends StatefulWidget {
   final Widget? loadingIndicator;
   final List? transactions;
   final bool? sandboxMode;
+
   const PaypalCheckoutView({
     Key? key,
     required this.onSuccess,
@@ -121,11 +122,11 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
                   return NavigationActionPolicy.ALLOW;
                 }
               },
-              initialUrlRequest: URLRequest(url: Uri.parse(checkoutUrl!)),
-              initialOptions: InAppWebViewGroupOptions(
-                crossPlatform: InAppWebViewOptions(
-                  useShouldOverrideUrlLoading: true,
-                ),
+              initialUrlRequest: URLRequest(url: WebUri(checkoutUrl!)),
+              // Convert to WebUri
+              initialSettings: InAppWebViewSettings(
+                useShouldOverrideUrlLoading:
+                    true, // useShouldOverrideUrlLoading
               ),
               onWebViewCreated: (InAppWebViewController controller) {
                 webView = controller;
