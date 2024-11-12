@@ -121,12 +121,12 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
                   return NavigationActionPolicy.ALLOW;
                 }
               },
-              initialUrlRequest: URLRequest(url: Uri.parse(checkoutUrl!)),
-              initialOptions: InAppWebViewGroupOptions(
-                crossPlatform: InAppWebViewOptions(
-                  useShouldOverrideUrlLoading: true,
-                ),
-              ),
+              initialUrlRequest: URLRequest(url: WebUri(checkoutUrl!)),
+              // initialOptions: InAppWebViewGroupOptions(
+              //   crossPlatform: InAppWebViewOptions(
+              //     useShouldOverrideUrlLoading: true,
+              //   ),
+              // ),
               onWebViewCreated: (InAppWebViewController controller) {
                 webView = controller;
               },
