@@ -33,28 +33,70 @@ To install the Flutter PayPal Payment Package, follow these steps
     ```
 2. Navigate to the PayPal checkout view with the desired configuration:
 ```dart
-PaypalCheckoutView(
-  sandboxMode: true,
-  clientId: "YOUR_CLIENT_ID",
-  secretKey: "YOUR_SECRET_KEY",
-  transactions: const [
-    // Define your transaction details here
-    {
-      "amount": {"total": "10.00", "currency": "USD"},
-      "description": "Payment for services rendered",
-    },
-  ],
-  onSuccess: (Map params) async {
-    // Handle successful payment
-  },
-  onError: (error) {
-    // Handle payment error
-  },
-  onCancel: () {
-    // Handle payment cancellation
-    // Implement the onSuccess, onError, and onCancel callbacks to handle the respective payment outcomes.
-  },
-);
+ Navigator.of(context).push(MaterialPageRoute(
+                  builder: (BuildContext context) => PaypalCheckoutView(
+                    sandboxMode: true,
+                    clientId: "",
+                    secretKey: "",
+                    transactions: const [
+                      {
+                        "amount": {
+                          "total": '70',
+                          "currency": "USD",
+                          "details": {
+                            "subtotal": '70',
+                            "shipping": '0',
+                            "shipping_discount": 0
+                          }
+                        },
+                        "description": "The payment transaction description.",
+                        // "payment_options": {
+                        //   "allowed_payment_method":
+                        //       "INSTANT_FUNDING_SOURCE"
+                        // },
+                        "item_list": {
+                          "items": [
+                            {
+                              "name": "Apple",
+                              "quantity": 4,
+                              "price": '5',
+                              "currency": "USD"
+                            },
+                            {
+                              "name": "Pineapple",
+                              "quantity": 5,
+                              "price": '10',
+                              "currency": "USD"
+                            }
+                          ],
+
+                          // shipping address is not required though
+                          //   "shipping_address": {
+                          //     "recipient_name": "tharwat",
+                          //     "line1": "Alexandria",
+                          //     "line2": "",
+                          //     "city": "Alexandria",
+                          //     "country_code": "EG",
+                          //     "postal_code": "21505",
+                          //     "phone": "+00000000",
+                          //     "state": "Alexandria"
+                          //  },
+                        }
+                      }
+                    ],
+                    note: "Contact us for any questions on your order.",
+                    onSuccess: (Map params) async {
+                      print("onSuccess: $params");
+                    },
+                    onError: (error) {
+                      print("onError: $error");
+                      Navigator.pop(context);
+                    },
+                    onCancel: () {
+                      print('cancelled:');
+                    },
+                  ),
+                ));
 ``` 
 ## ⚡ Donate 
 
