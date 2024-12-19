@@ -116,6 +116,7 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
                   return NavigationActionPolicy.CANCEL;
                 }
                 if (url.toString().contains(cancelURL)) {
+                  widget.onCancel();
                   return NavigationActionPolicy.CANCEL;
                 } else {
                   return NavigationActionPolicy.ALLOW;
