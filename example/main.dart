@@ -1,90 +1,98 @@
+/// Entry point of the application.
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_paypal_payment/flutter_paypal_payment.dart';
+import 'package:flutter_paypal_payment/src/transaction_option/transaction_option.dart';
 
+/// The main function is the starting point of the Flutter application.
 void main() {
   runApp(const PaypalPaymentDemo());
 }
 
+/// A stateless widget that demonstrates PayPal payment integration.
 class PaypalPaymentDemo extends StatelessWidget {
   const PaypalPaymentDemo({super.key});
 
+  /// Builds the MaterialApp widget for the demo.
+  ///
+  /// Contains a button which navigates to the PayPal checkout view when pressed.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'PaypalPaymentDemp',
+      title: 'PaypalPaymentDemo',
       debugShowCheckedModeBanner: false,
       home: Scaffold(
         body: Center(
           child: TextButton(
+            /// When pressed, navigates to the PayPal checkout screen.
             onPressed: () {
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (BuildContext context) => PaypalCheckoutView(
-                  sandboxMode: true,
-                  clientId: "YOUR CLIENT ID",
-                  secretKey: "YOUR SECRET KEY",
-                  transactions: const [
-                    {
-                      "amount": {
-                        "total": '100',
-                        "currency": "USD",
-                        "details": {
-                          "subtotal": '100',
-                          "shipping": '0',
-                          "shipping_discount": 0
-                        }
-                      },
-                      "description": "The payment transaction description.",
-                      // "payment_options": {
-                      //   "allowed_payment_method":
-                      //       "INSTANT_FUNDING_SOURCE"
-                      // },
-                      "item_list": {
-                        "items": [
-                          {
-                            "name": "Apple",
-                            "quantity": 4,
-                            "price": '10',
-                            "currency": "USD"
-                          },
-                          {
-                            "name": "Pineapple",
-                            "quantity": 5,
-                            "price": '12',
-                            "currency": "USD"
-                          }
-                        ],
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (BuildContext context) => PaypalCheckoutView(
+                    /// Whether to use PayPal's sandbox mode for testing.
+                    sandboxMode: true,
 
-                        // Optional
-                        //   "shipping_address": {
-                        //     "recipient_name": "Tharwat samy",
-                        //     "line1": "tharwat",
-                        //     "line2": "",
-                        //     "city": "tharwat",
-                        //     "country_code": "EG",
-                        //     "postal_code": "25025",
-                        //     "phone": "+00000000",
-                        //     "state": "ALex"
-                        //  },
-                      }
-                    }
-                  ],
-                  note: "Contact us for any questions on your order.",
-                  onSuccess: (Map params) async {
-                    log("onSuccess: $params");
-                    Navigator.pop(context);
-                  },
-                  onError: (error) {
-                    log("onError: $error");
-                    Navigator.pop(context);
-                  },
-                  onCancel: () {
-                    print('cancelled:');
-                    Navigator.pop(context);
-                  },
+                    /// Your PayPal REST API client ID.
+                    clientId: "",
+
+                    /// Your PayPal REST API secret key.
+                    secretKey: "",
+
+                    /// Transaction details including items and total amount.
+                    transactions: const TransactionOption(
+                      amount: PayPalAmount(
+                        total: "100",
+                        currency: "USD",
+                        details: PaymentDetails(
+                          subtotal: '100',
+                          shipping: "0",
+                          shippingDiscount: 0,
+                        ),
+                      ),
+                      description: "The payment transaction description.",
+                      itemList: ItemList(
+                        items: [
+                          Item(
+                            name: "apple",
+                            quantity: 1,
+                            price: "50",
+                            currency: "USD",
+                          ),
+                          Item(
+                            name: "Pineapple",
+                            quantity: 5,
+                            price: "10",
+                            currency: "USD",
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    /// Optional note shown to the user about the order.
+                    note: "Contact us for any questions on your order.",
+
+                    /// Callback triggered when the payment is successful.
+                    /// Logs the result and returns to the previous screen.
+                    onSuccess: (model) async {
+                      log("onSuccess:${model.toJson()}");
+                      Navigator.pop(context);
+                    },
+
+                    /// Callback triggered when an error occurs during payment.
+                    onError: (error) {
+                      log("onError: $error");
+                      Navigator.pop(context);
+                    },
+
+                    /// Callback triggered when the user cancels the payment.
+                    onCancel: () {
+                      print('cancelled:');
+                      Navigator.pop(context);
+                    },
+                  ),
                 ),
-              ));
+              );
             },
             child: const Text('Pay with paypal'),
           ),

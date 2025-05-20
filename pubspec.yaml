@@ -1,5 +1,6 @@
 name: flutter_paypal_payment
-description: This package simplifies integrating PayPal payments into your mobile app. Key features include seamless in-app PayPal integration
+description: This package simplifies integrating PayPal payments into your
+  mobile app. Key features include seamless in-app PayPal integration
 version: 1.0.8
 homepage: https://github.com/tharwatsamy/flutter_paypal_payment_checkout
 
@@ -8,12 +9,11 @@ environment:
   flutter: ">=1.17.0"
 
 dependencies:
-  dio: ^5.3.3
+  dio: ^5.8.0+1
+  equatable: ^2.0.7
   flutter:
     sdk: flutter
   flutter_inappwebview: ^6.1.5
-
-
 
 dev_dependencies:
   flutter_lints: ^2.0.0
@@ -25,4 +25,3 @@ dev_dependencies:
 # following page: https://dart.dev/tools/pub/pubspec
 # The following section is specific to Flutter packages.
 flutter: null
-

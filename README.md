@@ -33,70 +33,72 @@ To install the Flutter PayPal Payment Package, follow these steps
     ```
 2. Navigate to the PayPal checkout view with the desired configuration:
 ```dart
- Navigator.of(context).push(MaterialPageRoute(
+  Navigator.of(context).push(
+                MaterialPageRoute(
                   builder: (BuildContext context) => PaypalCheckoutView(
+                    /// Whether to use PayPal's sandbox mode for testing.
                     sandboxMode: true,
-                    clientId: "",
-                    secretKey: "",
-                    transactions: const [
-                      {
-                        "amount": {
-                          "total": '70',
-                          "currency": "USD",
-                          "details": {
-                            "subtotal": '70',
-                            "shipping": '0',
-                            "shipping_discount": 0
-                          }
-                        },
-                        "description": "The payment transaction description.",
-                        // "payment_options": {
-                        //   "allowed_payment_method":
-                        //       "INSTANT_FUNDING_SOURCE"
-                        // },
-                        "item_list": {
-                          "items": [
-                            {
-                              "name": "Apple",
-                              "quantity": 4,
-                              "price": '5',
-                              "currency": "USD"
-                            },
-                            {
-                              "name": "Pineapple",
-                              "quantity": 5,
-                              "price": '10',
-                              "currency": "USD"
-                            }
-                          ],
 
-                          // shipping address is not required though
-                          //   "shipping_address": {
-                          //     "recipient_name": "tharwat",
-                          //     "line1": "Alexandria",
-                          //     "line2": "",
-                          //     "city": "Alexandria",
-                          //     "country_code": "EG",
-                          //     "postal_code": "21505",
-                          //     "phone": "+00000000",
-                          //     "state": "Alexandria"
-                          //  },
-                        }
-                      }
-                    ],
+                    /// Your PayPal REST API client ID.
+                    clientId: "",
+
+                    /// Your PayPal REST API secret key.
+                    secretKey: "",
+
+                    /// Transaction details including items and total amount.
+                    transactions: const TransactionOption(
+                      amount: PayPalAmount(
+                        total: "100",
+                        currency: "USD",
+                        details: PaymentDetails(
+                          subtotal: '100',
+                          shipping: "0",
+                          shippingDiscount: 0,
+                        ),
+                      ),
+                      description: "The payment transaction description.",
+                      itemList: ItemList(
+                        items: [
+                          Item(
+                            name: "apple",
+                            quantity: 1,
+                            price: "50",
+                            currency: "USD",
+                          ),
+                          Item(
+                            name: "Pineapple",
+                            quantity: 5,
+                            price: "10",
+                            currency: "USD",
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    /// Optional note shown to the user about the order.
                     note: "Contact us for any questions on your order.",
-                    onSuccess: (Map params) async {
-                      print("onSuccess: $params");
-                    },
-                    onError: (error) {
-                      print("onError: $error");
+
+                    /// Callback triggered when the payment is successful.
+                    /// Logs the result and returns to the previous screen.
+                    onSuccess: (model) async {
+                      log("onSuccess:${model.toJson()}");
                       Navigator.pop(context);
                     },
+
+                    /// Callback triggered when an error occurs during payment.
+                    onError: (error) {
+                      log("onError: $error");
+                      Navigator.pop(context);
+                    },
+
+                    /// Callback triggered when the user cancels the payment.
                     onCancel: () {
                       print('cancelled:');
+                      Navigator.pop(context);
                     },
                   ),
-                ));
+                ),
+              );
 ``` 
 ## ⚡ Donate 
 

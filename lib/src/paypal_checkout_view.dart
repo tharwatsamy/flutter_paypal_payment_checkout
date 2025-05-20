@@ -1,18 +1,49 @@
-library flutter_paypal_checkout;
+library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter_paypal_payment/src/payment_success_model/payment_success_model.dart';
 import 'package:flutter_paypal_payment/src/paypal_service.dart';
+import 'package:flutter_paypal_payment/src/transaction_option/transaction_option.dart';
 
+/// This class represents a PayPal checkout screen as a stateful widget.
+/// It's stateful because it may undergo changes (like loading, error, or success) during the payment process.
 class PaypalCheckoutView extends StatefulWidget {
-  final Function onSuccess, onCancel, onError;
-  final String? note, clientId, secretKey;
+  /// Callback function triggered when the payment is successful.
+  /// It receives a [PaymentSuccessModel] containing details of the transaction.
+  final Function(PaymentSuccessModel model) onSuccess;
 
+  /// Callback function triggered when the payment process is canceled by the user.
+  final Function onCancel;
+
+  /// Callback function triggered when an error occurs during the payment process.
+  final Function onError;
+
+  /// Optional note or description associated with the payment.
+  final String? note;
+
+  /// Your PayPal client ID, required to authenticate API requests.
+  final String? clientId;
+
+  /// Your PayPal secret key, used along with the client ID for authorization.
+  final String? secretKey;
+
+  /// Optional custom [AppBar] to be shown on the checkout screen.
+  final AppBar? appBar;
+
+  /// Optional widget to show while the payment is loading or processing.
   final Widget? loadingIndicator;
-  final List? transactions;
+
+  /// Transaction details such as amount, currency, item list, etc.
+  final TransactionOption transactions;
+
+  /// Whether to use the PayPal sandbox environment (for testing).
+  /// Defaults to `false` for production/live mode.
   final bool? sandboxMode;
+
+  /// Constructor for [PaypalCheckoutView], initializing required and optional fields.
   const PaypalCheckoutView({
-    Key? key,
+    super.key,
     required this.onSuccess,
     required this.onError,
     required this.onCancel,
@@ -22,8 +53,10 @@ class PaypalCheckoutView extends StatefulWidget {
     this.sandboxMode = false,
     this.note = '',
     this.loadingIndicator,
-  }) : super(key: key);
+    this.appBar,
+  });
 
+  /// Creates the mutable state for this widget.
   @override
   State<StatefulWidget> createState() {
     return PaypalCheckoutViewState();
@@ -31,14 +64,14 @@ class PaypalCheckoutView extends StatefulWidget {
 }
 
 class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
-  String? checkoutUrl;
+  String? _checkoutUrl;
   String navUrl = '';
-  String executeUrl = '';
-  String accessToken = '';
+  String _executeUrl = '';
+  String _accessToken = '';
   bool loading = true;
-  bool pageloading = true;
+  bool pageLoading = true;
   bool loadingError = false;
-  late PaypalServices services;
+  late PaypalServices _services;
   int pressed = 0;
   double progress = 0;
   final String returnURL =
@@ -47,20 +80,20 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
 
   late InAppWebViewController webView;
 
-  Map getOrderParams() {
+  Map<String, dynamic> getOrderParams() {
     Map<String, dynamic> temp = {
       "intent": "sale",
       "payer": {"payment_method": "paypal"},
-      "transactions": widget.transactions,
+      "transactions": [widget.transactions.toJson()],
       "note_to_payer": widget.note,
-      "redirect_urls": {"return_url": returnURL, "cancel_url": cancelURL}
+      "redirect_urls": {"return_url": returnURL, "cancel_url": cancelURL},
     };
     return temp;
   }
 
   @override
   void initState() {
-    services = PaypalServices(
+    _services = PaypalServices(
       sandboxMode: widget.sandboxMode!,
       clientId: widget.clientId!,
       secretKey: widget.secretKey!,
@@ -69,17 +102,17 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
     super.initState();
     Future.delayed(Duration.zero, () async {
       try {
-        Map getToken = await services.getAccessToken();
+        Map getToken = await _services.getAccessToken();
 
         if (getToken['token'] != null) {
-          accessToken = getToken['token'];
+          _accessToken = getToken['token'];
           final body = getOrderParams();
-          final res = await services.createPaypalPayment(body, accessToken);
+          final res = await _services.createPaypalPayment(body, _accessToken);
 
           if (res["approvalUrl"] != null) {
             setState(() {
-              checkoutUrl = res["approvalUrl"];
-              executeUrl = res["executeUrl"];
+              _checkoutUrl = res["approvalUrl"];
+              _executeUrl = res["executeUrl"];
             });
           } else {
             widget.onError(res);
@@ -95,16 +128,16 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
 
   @override
   Widget build(BuildContext context) {
-    if (checkoutUrl != null) {
+    if (_checkoutUrl != null) {
       return Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          centerTitle: true,
-          title: const Text(
-            "Paypal Payment",
-          ),
-        ),
+        appBar:
+            widget.appBar ??
+            AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              centerTitle: true,
+              title: const Text("Paypal Payment"),
+            ),
         body: Stack(
           children: <Widget>[
             InAppWebView(
@@ -112,7 +145,7 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
                 final url = navigationAction.request.url;
 
                 if (url.toString().contains(returnURL)) {
-                  exceutePayment(url, context);
+                  _executePayment(url, context);
                   return NavigationActionPolicy.CANCEL;
                 }
                 if (url.toString().contains(cancelURL)) {
@@ -121,7 +154,7 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
                   return NavigationActionPolicy.ALLOW;
                 }
               },
-              initialUrlRequest: URLRequest(url: WebUri(checkoutUrl!)),
+              initialUrlRequest: URLRequest(url: WebUri(_checkoutUrl!)),
               // initialOptions: InAppWebViewGroupOptions(
               //   crossPlatform: InAppWebViewOptions(
               //     useShouldOverrideUrlLoading: true,
@@ -133,8 +166,10 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
               onCloseWindow: (InAppWebViewController controller) {
                 widget.onCancel();
               },
-              onProgressChanged:
-                  (InAppWebViewController controller, int progress) {
+              onProgressChanged: (
+                InAppWebViewController controller,
+                int progress,
+              ) {
                 setState(() {
                   this.progress = progress / 100;
                 });
@@ -142,44 +177,41 @@ class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
             ),
             progress < 1
                 ? SizedBox(
-                    height: 3,
-                    child: LinearProgressIndicator(
-                      value: progress,
-                    ),
-                  )
+                  height: 3,
+                  child: LinearProgressIndicator(value: progress),
+                )
                 : const SizedBox(),
           ],
         ),
       );
     } else {
       return Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          centerTitle: true,
-          title: const Text(
-            "Paypal Payment",
-          ),
-        ),
+        appBar:
+            widget.appBar ??
+            AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              centerTitle: true,
+              title: Text("Paypal Payment"),
+            ),
         body: Center(
-            child:
-                widget.loadingIndicator ?? const CircularProgressIndicator()),
+          child: widget.loadingIndicator ?? const CircularProgressIndicator(),
+        ),
       );
     }
   }
 
-  void exceutePayment(Uri? url, BuildContext context) {
+  void _executePayment(Uri? url, BuildContext context) {
     final payerID = url!.queryParameters['PayerID'];
     if (payerID != null) {
-      services.executePayment(executeUrl, payerID, accessToken).then(
-        (id) {
-          if (id['error'] == false) {
-            widget.onSuccess(id);
-          } else {
-            widget.onError(id);
-          }
-        },
-      );
+      _services.executePayment(_executeUrl, payerID, _accessToken).then((id) {
+        if (id['error'] == false) {
+          PaymentSuccessModel model = PaymentSuccessModel.fromJson(id);
+          widget.onSuccess(model);
+        } else {
+          widget.onError(id);
+        }
+      });
     } else {
       widget.onError('Something went wront PayerID == null');
     }
