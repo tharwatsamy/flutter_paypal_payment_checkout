@@ -1,329 +1,252 @@
-library flutter_paypal_checkout;
-
-import 'dart:developer';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:flutter_paypal_payment/src/paypal_service.dart';
 
-class PaypalCheckoutView extends StatefulWidget {
-  final Function onSuccess, onCancel, onError;
-  final String? note, clientId, secretKey, appName;
-  final String? returnUrl;
-  final String? cancelUrl;
+class PaypalCheckoutResult {
+  final String? orderId;
+  final String? error;
+  final bool cancelled;
 
-  final Widget? loadingIndicator;
-  final List? transactions;
-  final bool? sandboxMode;
+  const PaypalCheckoutResult.approved(this.orderId)
+      : error = null,
+        cancelled = false;
 
-  const PaypalCheckoutView({
-    Key? key,
-    required this.onSuccess,
-    required this.onError,
-    required this.onCancel,
-    required this.transactions,
-    required this.clientId,
-    required this.secretKey,
-    this.appName,
-    this.sandboxMode = false,
-    this.note = '',
-    this.returnUrl,
-    this.cancelUrl,
-    this.loadingIndicator,
-  }) : super(key: key);
+  const PaypalCheckoutResult.cancelled()
+      : orderId = null,
+        error = null,
+        cancelled = true;
 
-  @override
-  State<StatefulWidget> createState() {
-    return PaypalCheckoutViewState();
-  }
+  const PaypalCheckoutResult.failed(this.error)
+      : orderId = null,
+        cancelled = false;
 }
 
-class PaypalCheckoutViewState extends State<PaypalCheckoutView> {
-  String? checkoutUrl;
-  String executeUrl = '';
-  String accessToken = '';
-  bool loading = true;
-  bool pageloading = true;
-  bool loadingError = false;
-  late PaypalServices services;
+class PaypalCheckoutView extends StatefulWidget {
+  final String orderId;
+  final String returnUrl;
+  final String cancelUrl;
+  final bool sandboxMode;
+
+  const PaypalCheckoutView({
+    super.key,
+    required this.orderId,
+    required this.returnUrl,
+    required this.cancelUrl,
+    this.sandboxMode = false,
+  });
+
+  @override
+  State<PaypalCheckoutView> createState() =>
+      _PaypalCheckoutViewState();
+}
+
+class _PaypalCheckoutViewState extends State<PaypalCheckoutView> {
+  InAppWebViewController? webView;
+
   double progress = 0;
-  late final String returnURL;
-  late final String cancelURL;
 
-  late InAppWebViewController webView;
+  bool _finished = false;
 
-  bool _handledCancel = false;
-  bool _handledSuccess = false;
-  bool _locked = false;
+  Timer? _timeoutTimer;
 
-  void triggerCancel() {
-    // Do NOT cancel if success already triggered
-    if (_handledSuccess) return;
-    if (_handledCancel) return;
+  Uri get _returnUri => Uri.parse(widget.returnUrl);
 
-    _handledCancel = true;
+  Uri get _cancelUri => Uri.parse(widget.cancelUrl);
 
-    widget.onCancel();
+  Uri get _approvalUri {
+    final host = widget.sandboxMode
+        ? 'www.sandbox.paypal.com'
+        : 'www.paypal.com';
 
-    Future.microtask(() {
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
-    });
-  }
-
-  Map getOrderParams() {
-    // We'll pass application_context via transactions[0]['appContext']
-    // to keep compatibility with the earlier createPaypalPayment signature.
-    // Build minimal payload: add appContext with shipping_preference + return/cancel
-
-    final appContext = widget.appName != null
-        ? {
-            'brand_name': widget.appName,
-            'shipping_preference': 'SET_PROVIDED_ADDRESS',
-            'return_url': returnURL,
-            'cancel_url': cancelURL,
-            'user_action': 'PAY_NOW' // or 'CONTINUE' - PAY_NOW shows Pay Now button
-          }
-        : {
-            'shipping_preference': 'SET_PROVIDED_ADDRESS',
-            'return_url': returnURL,
-            'cancel_url': cancelURL,
-            'user_action': 'PAY_NOW' // or 'CONTINUE' - PAY_NOW shows Pay Now button
-          };
-
-    /// I know the above looks stupid but whatever as long it works...
-
-    // clone transactions so we can inject appContext into first transaction map
-    if (widget.transactions != null && widget.transactions is List && widget.transactions!.isNotEmpty) {
-      final List tx = List.from(widget.transactions!);
-      final first = Map<String, dynamic>.from(tx[0]);
-      first['appContext'] = appContext;
-      tx[0] = first;
-      return {
-        'transactions': tx, // but createPaypalPayment expects the list directly, so we'll return tx
-      };
-    } else {
-      // Fallback empty transaction with appContext
-      return {
-        'transactions': [
-          {
-            'amount': {'total': '0.00', 'currency': 'USD'},
-            'appContext': appContext
-          }
-        ]
-      };
-    }
+    return Uri.https(
+      host,
+      '/checkoutnow',
+      {'token': widget.orderId},
+    );
   }
 
   @override
   void initState() {
     super.initState();
 
-    assert(widget.returnUrl != null && widget.cancelUrl != null);
-    returnURL = widget.returnUrl!;
-    cancelURL = widget.cancelUrl!;
+    if (widget.orderId.trim().isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _finish(
+          const PaypalCheckoutResult.failed(
+            'Invalid PayPal Order ID.',
+          ),
+        );
+      });
 
-    services = PaypalServices(
-      sandboxMode: widget.sandboxMode!,
-      clientId: widget.clientId!,
-      secretKey: widget.secretKey!,
+      return;
+    }
+
+    _timeoutTimer = Timer(
+      const Duration(minutes: 10),
+          () {
+        _finish(
+          const PaypalCheckoutResult.failed(
+            'PayPal approval timed out. Please try again.',
+          ),
+        );
+      },
     );
+  }
 
-    Future.delayed(Duration.zero, () async {
-      try {
-        final tokenResult = await services.getAccessToken();
-        if (tokenResult['error'] == false && tokenResult['token'] != null) {
-          accessToken = tokenResult['token'];
-
-          // Build transactions list with appContext injected
-          final orderParamsWrapper = getOrderParams();
-          final txList = orderParamsWrapper['transactions'];
-
-          // create v2 order
-          final createRes = await services.createPaypalPayment(txList, accessToken);
-
-          if (createRes['approveUrl'] != null && createRes['orderId'] != null) {
-            setState(() {
-              checkoutUrl = createRes['approveUrl'];
-              executeUrl = createRes['orderId']; // here executeUrl stores orderId (used on return)
-            });
-          } else {
-            widget.onError(createRes);
-          }
-        } else {
-          widget.onError(tokenResult);
-        }
-      } catch (e) {
-        widget.onError(e);
+  bool _matchesEndpoint(Uri current, Uri expected) {
+    String normalizePath(String path) {
+      if (path.length > 1 && path.endsWith('/')) {
+        return path.substring(0, path.length - 1);
       }
-    });
+      return path;
+    }
 
-    Future.delayed(const Duration(minutes: 3), () {
-      if (!_handledSuccess && mounted) {
-        widget.onError("Payment timeout");
-        Navigator.pop(context);
+    return current.scheme == expected.scheme &&
+        current.host.toLowerCase() ==
+            expected.host.toLowerCase() &&
+        current.port == expected.port &&
+        normalizePath(current.path) ==
+            normalizePath(expected.path);
+  }
+
+  void _finish(PaypalCheckoutResult result) {
+    if (_finished || !mounted) return;
+
+    _finished = true;
+    _timeoutTimer?.cancel();
+
+    Navigator.of(context).pop(result);
+  }
+
+  Future<NavigationActionPolicy> _handleNavigation(
+      InAppWebViewController controller,
+      NavigationAction navigationAction,
+      ) async
+  {
+    if (_finished) {
+      return NavigationActionPolicy.CANCEL;
+    }
+
+    final url = navigationAction.request.url;
+
+    if (url == null) {
+      return NavigationActionPolicy.ALLOW;
+    }
+
+    // Check cancellation FIRST.
+    if (_matchesEndpoint(url, _cancelUri)) {
+      _finish(
+        const PaypalCheckoutResult.cancelled(),
+      );
+
+      return NavigationActionPolicy.CANCEL;
+    }
+
+    // Buyer returned from PayPal.
+    if (_matchesEndpoint(url, _returnUri)) {
+      final returnedOrderId =
+          url.queryParameters['token'] ??
+              url.queryParameters['orderId'];
+
+      if (returnedOrderId == null ||
+          returnedOrderId.isEmpty) {
+        _finish(
+          const PaypalCheckoutResult.failed(
+            'PayPal did not return an Order ID.',
+          ),
+        );
+
+        return NavigationActionPolicy.CANCEL;
       }
-    });
+
+      // Never accept a different order ID from the redirect.
+      if (returnedOrderId != widget.orderId) {
+        _finish(
+          const PaypalCheckoutResult.failed(
+            'PayPal returned an unexpected Order ID.',
+          ),
+        );
+
+        return NavigationActionPolicy.CANCEL;
+      }
+
+      // Approval only. No capture happens here.
+      _finish(
+        PaypalCheckoutResult.approved(returnedOrderId),
+      );
+
+      return NavigationActionPolicy.CANCEL;
+    }
+
+    return NavigationActionPolicy.ALLOW;
+  }
+
+
+  @override
+  void dispose() {
+    _timeoutTimer?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (checkoutUrl != null) {
-      return PopScope(
-        canPop: !_locked,
-        onPopInvokedWithResult: (didPop, result) {
-          if (didPop && !_handledSuccess) {
-            if (_handledCancel) return;
-            _handledCancel = true;
-            widget.onCancel();
-          }
-        },
-        child: Scaffold(
-          appBar: AppBar(
-            automaticallyImplyLeading: !_locked,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            centerTitle: true,
-            title: const Text("Paypal"),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('PayPal Payment'),
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            _finish(
+              const PaypalCheckoutResult.cancelled(),
+            );
+          },
+        ),
+      ),
+      body: Stack(
+        children: [
+          InAppWebView(
+            initialUrlRequest: URLRequest(
+              url: WebUri(_approvalUri.toString()),
+            ),
+            initialSettings: InAppWebViewSettings(
+              useShouldOverrideUrlLoading: true,
+              javaScriptEnabled: true,
+              domStorageEnabled: true,
+              thirdPartyCookiesEnabled: true,
+              cacheEnabled: true,
+            ),
+            onWebViewCreated: (controller) {
+              webView = controller;
+            },
+            shouldOverrideUrlLoading: _handleNavigation,
+            onProgressChanged: (controller, value) {
+              if (!mounted) return;
+
+              setState(() {
+                progress = value / 100;
+              });
+            },
+            onReceivedError: (controller, request, error) {
+              if (request.isForMainFrame == true) {
+                _finish(
+                  const PaypalCheckoutResult.failed(
+                    'Unable to load PayPal. Please check your internet connection and try again.',
+                  ),
+                );
+              }
+            },
           ),
-          body: Stack(
-            children: <Widget>[
-              InAppWebView(
-                shouldOverrideUrlLoading: (controller, navigationAction) async {
-                  if (_handledSuccess || _handledCancel) {
-                    return NavigationActionPolicy.CANCEL;
-                  }
-                  final url = navigationAction.request.url;
-                  if (url == null) return NavigationActionPolicy.ALLOW;
-
-                  // PayPal returns token = Order Id for v2
-                  if (url.host == Uri.parse(returnURL).host) {
-                    // extract token param (orderId)
-                    final orderId = url.queryParameters['token'] ?? url.queryParameters['orderId'] ?? url.queryParameters['paymentId'];
-                    if (orderId != null && orderId.isNotEmpty) {
-                      // capture the order
-                      final captureRes = await services.executePayment(orderId, accessToken);
-                      if (captureRes['error'] == false && captureRes['data']?['status'] == 'COMPLETED') {
-                        if (!_handledSuccess) {
-                          _handledSuccess = true;
-                          widget.onSuccess(captureRes);
-                        }
-                      } else {
-                        final details = captureRes['data'];
-                        final issue = details?['details']?[0]?['issue'];
-                        if (issue == 'INSTRUMENT_DECLINED') {
-                          final links = details?['links'] ?? [];
-                          final redirect = links.firstWhere(
-                            (l) => l['rel'] == 'redirect',
-                            orElse: () => null,
-                          );
-                          if (redirect != null) {
-                            final redirectUrl = redirect['href'];
-
-                            // reloading PayPal approval
-                            await webView.loadUrl(
-                              urlRequest: URLRequest(url: WebUri(redirectUrl)),
-                            );
-
-                            return NavigationActionPolicy.CANCEL;
-                          }
-                        }
-                        widget.onError(captureRes);
-                      }
-                    } else {
-                      widget.onError('No order token found in return URL.');
-                    }
-
-                    // close the webview route
-                    Future.microtask(() {
-                      if (Navigator.of(context).canPop()) Navigator.of(context).pop();
-                    });
-                    return NavigationActionPolicy.CANCEL;
-                  }
-
-                  // Cancel URL handling
-                  if (url.host == Uri.parse(cancelURL).host) {
-                    triggerCancel();
-                    return NavigationActionPolicy.CANCEL;
-                  }
-
-                  return NavigationActionPolicy.ALLOW;
-                },
-
-                /// BLOCK BACK AFTER PAY CLICK
-                onLoadStop: (controller, url) {
-                  if (url != null && url.toString().contains("useraction=commit")) {
-                    // PayPal enters final "processing…" screen
-                    _locked = true;
-                    setState(() {});
-                  }
-                },
-                initialUrlRequest: URLRequest(url: WebUri(checkoutUrl!)),
-                onWebViewCreated: (InAppWebViewController controller) {
-                  webView = controller;
-                },
-                onCloseWindow: (InAppWebViewController controller) {
-                  triggerCancel();
-                },
-                onProgressChanged: (InAppWebViewController controller, int prog) {
-                  setState(() {
-                    progress = prog / 100;
-                  });
-                },
-                // onUpdateVisitedHistory: (controller, url, _) async {
-                //   if (url != null && url.toString().contains(returnURL)) {
-                //     final orderId = url.queryParameters['token'] ?? url.queryParameters['orderId'] ?? url.queryParameters['paymentId'];
-                //     if (orderId != null && orderId.isNotEmpty) {
-                //       final captureRes = await services.executePayment(orderId, accessToken);
-                //       if (captureRes['error'] == false) {
-                //         if (!_handledSuccess) {
-                //           _handledSuccess = true;
-                //           widget.onSuccess(captureRes);
-                //         }
-                //       } else {
-                //         widget.onError(captureRes);
-                //       }
-                //     } else {
-                //       widget.onError('No order token found in return URL.');
-                //     }
-                //     Future.microtask(() {
-                //       if (Navigator.of(context).canPop()) Navigator.of(context).pop();
-                //     });
-                //   }
-                // },
-                initialSettings: InAppWebViewSettings(
-                  useShouldOverrideUrlLoading: true,
-                  clearSessionCache: true,
-                  clearCache: true,
-                  cacheEnabled: false,
-                ),
+          if (progress < 1)
+            Align(
+              alignment: Alignment.topCenter,
+              child: LinearProgressIndicator(
+                value: progress,
               ),
-              if (progress < 1) SizedBox(height: 3, child: LinearProgressIndicator(value: progress))
-            ],
-          ),
-        ),
-      );
-    } else {
-      return PopScope(
-        canPop: true,
-        onPopInvokedWithResult: (didPop, result) {
-          if (didPop && !_handledSuccess) {
-            if (_handledCancel) return;
-            _handledCancel = true;
-            widget.onCancel();
-          }
-        },
-        child: Scaffold(
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            centerTitle: true,
-            title: const Text("Paypal Payment"),
-          ),
-          body: Center(child: widget.loadingIndicator ?? const CircularProgressIndicator()),
-        ),
-      );
-    }
+            ),
+        ],
+      ),
+    );
   }
 }
